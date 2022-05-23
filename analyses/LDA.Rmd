@@ -1,0 +1,73 @@
+---
+title: "LDA"
+author: "Jorge"
+date: "3/14/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages loading,message= FALSE,warning=FALSE}
+library(mclust)
+library(knitr)
+library(dplyr)
+library(MASS)
+library(ggplot2)
+library(ggpubr)
+library(klaR)
+library(readr)
+library(tibble)
+```
+
+```{r Data loading}
+data <- read_delim("~/Documents/GitHub/JEcology_Islaetal2022/data/dataset.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE)
+
+data<-column_to_rownames(data, var = "tree")%>% 
+  mutate(area = factor(area, levels = c("SABCOL", "SABOJI", "SABMAR"))) # tree identification to row names.
+
+
+data$area <- as.numeric(data$area)
+
+data$d1 <- as.numeric(data$d1)
+data$h <- as.numeric(data$h)
+data$collapsed_cropsize <- as.numeric(data$collapsed_cropsize)
+
+data$diam <- as.numeric(data$diam)
+data$nseed <- as.numeric(data$nseed)
+data$oneseedw <- as.numeric(data$oneseedw)
+data$sunken <- as.numeric(data$sunken)
+
+
+# I select just variables without multicolinearity. I exclude neighborhood attributes for Discriminant analyses (very area dependent)
+dataLDA2<-data[,c(1,2,4,6,10,12,14,16)]
+ #Setting colors
+sabcolors <- c("SABCOL"="#35978f", "SABOJI"="#dfc27d", "SABMAR"="#8c510a")
+```
+
+```{r LDA, warning=FALSE }
+library(MASS)
+mod2=lda(dataLDA2$area~ .,data=dataLDA2)
+mod2
+table(predict(mod2)$clas,dataLDA2$area)
+tbc = (27+22+25)/105
+tmc=1-tbc
+tbc*100 # 70.47619 EL 70% DE LOS CASOS SON CORRECTAMENTE ASIGNADOS
+mod2$scaling
+
+library(klaR)
+sabcolors <- c("SABCOL"="#35978f", "SABOJI"="#dfc27d", "SABMAR"="#8c510a")
+
+wilks<-greedy.wilks(area~ d1+h+collapsed_cropsize+diam+nseed+oneseedw+sunken,prior=c(0.33,0.33, 0.33),data = dataLDA2, niveau = 0.99)
+wilks
+
+data$area<-as.factor(data$area)
+
+wine.lda.values2<-predict(mod2)
+newdata2<-data.frame(type =data$area, lda = wine.lda.values2$x)
+ldaplot<-ggplot(newdata2) + geom_point(aes(lda.LD1, lda.LD2, colour = type), size = 4) + stat_ellipse (aes(lda.LD1, lda.LD2, colour = type, ))+ scale_color_manual(values=sabcolors)+xlim(-5,5) + theme(panel.background = element_blank(),axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),panel.border = element_rect(colour = "black", fill=NA, size=0.5))
+ldaplot
+```
+#Results showed in SupMat: Table S5 & Figure S8
+```

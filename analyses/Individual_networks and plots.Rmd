@@ -1,0 +1,975 @@
+---
+title: "Individual_networks and plots"
+author: "Jorge"
+date: "3/14/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Package loading, include = FALSE}
+library(ggplot2)
+library(reshape2)
+library(readr)
+library(patchwork)
+library(vegan)
+library(permute)
+library(lattice)
+library(grid)
+library(tibble)
+library(ggnet)
+library(intergraph)
+library(RColorBrewer)
+library(GGally)
+library(network)
+library(sna)
+library(dplyr)
+library(bipartite)
+library(gridGraphics)
+library(magrittr)
+library(igraph)
+library(wesanderson)
+library(ca)
+library(usethis)
+library(devtools)
+#devtools::install_github("pedroj/bipartite_plots")
+library(ggbipart)
+library(dplyr)
+library(bootstrap)
+library(sampling)
+library(textshape)
+library(nFactors)
+library(ade4)
+library(vegan)
+library(devtools)
+devtools::install_github("pakillo/effectiveness_pckg", force=TRUE)
+library(effect.lndscp)
+```
+
+#Interaction data loading
+```{r Data loading + data as numeric}
+data <- read_delim ("~/Documents/GitHub/JEcology_Isla2022/data/dataset.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+
+data<-column_to_rownames(data, loc = 1 )%>% 
+  mutate(area = factor(area, levels = c("SABCOL", "SABOJI", "SABMAR"))) # tree identification to row names.
+
+#Frequency of appearance of interactions as numerical variables. 
+data$fa_4cone_chl <- as.numeric(data$fa_4cone_chl)
+data$fa_apo <- as.numeric(data$fa_apo)
+data$fa_mus <- as.numeric(data$fa_mus)
+data$fa_mesophleps <- as.numeric(data$fa_mesophleps)
+data$fa_elachista <- as.numeric(data$fa_elachista)
+data$fa_nanodiscus <- as.numeric(data$fa_nanodiscus)
+data$fa_megastigmus <- as.numeric(data$fa_megastigmus)
+```
+
+```{r Interaction matrix creation}
+int<-data[,c(1,17,18,19,20,21,22,23)] #Filtering interactions of the raw dataset
+
+#Splitting dataset by area
+intALL<-int[,-1,]      #Big-picture
+intCOL<-int[1:35,-1]   #Colonization front stand
+intMAR<-int[36:70,-1]  #Intermediate maturity stand
+intOJI<-int[71:105,-1] #Mature stand
+
+
+intALL<-as.matrix(intALL)  #Datasets as a matrix
+#dim(intALL) #Matrix size check
+intCOL<-as.matrix(intCOL)  #Datasets as a matrix
+#dim(intCOL) #Matrix size check
+intOJI<-as.matrix(intOJI)  #Datasets as a matrix
+#dim(intOJI) #Matrix size check
+intMAR<-as.matrix(intMAR)  #Datasets as a matrix
+#dim(intMAR) #Matrix size check
+```
+
+```{r Networks preview}
+#Networks preview
+
+plotweb(intALL, col.interaction = 'snow3', col.high = 'black', col.low = "green")
+#visweb(intALL, type = "nested")
+plotweb(intCOL, col.interaction = 'snow3', col.high = 'black', col.low = "#35978f")
+#visweb(intCOL, type = "nested")
+plotweb(intOJI, col.interaction = 'snow3', col.high = 'black', col.low = '#dfc27d')
+#visweb(intOJI, type = "nested")
+plotweb(intMAR, col.interaction = 'snow3', col.high = 'black', col.low = '#8c510a')
+#visweb(intMAR, type = "nested")
+```
+
+#Now I construct-plot a bipartite weighted individual-based network (interactions between individual plants and antagonist species based on occurrence frequency in sampling), using ggnet.
+
+```{r vis.BIPARTITE}
+intALL.m1 = network (intALL, matrix.type = "bipartite", ignore.eval= FALSE, names.eval = "weights")
+
+# Colour fixed
+
+col = c("actor"= "#4dac26", "event" = "#dfc27d")
+
+network.vertex.names(intALL.m1)[106:112] <- c("CHL", "APO", "MUS", "MES", "ELA", "NAN", "MEG")
+#network.vertex.names(intALL.m1)
+
+ALL.net<-bip_ggnet(intALL.m1, as.matrix(intALL), 
+                   size = 0, 
+                   shape ="mode", 
+                   palette = col, 
+                   color = "mode", 
+                   layout.exp = 0.1) + 
+    geom_point(aes(color= col), size= 10,
+                         color= "white") +
+          geom_point(aes(color= color), size= 10,
+                         alpha= 0.1) +
+          geom_point(aes(color= color), size= 8) +
+          geom_text(aes(label= network.vertex.names(intALL.m1)),
+                        color= "white", size= 2,
+                        fontface="bold") +
+          guides(color= FALSE) +
+          theme(legend.position="none")
+ALL.net
+```
+
+#Now each stand separately
+#SABCOL
+```{r}
+intCOL.m1 = network (intCOL, matrix.type = "bipartite", ignore.eval= FALSE, names.eval = "weights")
+
+sabcolors <- c("SABCOL"="#35978f", "SABOJI"="#dfc27d", "SABMAR"="#8c510a")
+
+col = c("actor" = "#35978f", "event" = "black")
+
+
+network.vertex.names(intCOL.m1)[36:42] <- c("CHL", "APO", "MUS", "MES", "ELA", "NAN", "MEG")
+
+COL.net<-bip_ggnet(intCOL.m1, as.matrix(intCOL), 
+                   size = 0, 
+                   shape ="mode", 
+                   palette = col, 
+                   color = "mode", 
+                   layout.exp = 0.1) + 
+    geom_point(aes(color= color), size= 12,
+                         color= "grey") +
+          geom_point(aes(color= color), size= 11,
+                         alpha= 0.5) +
+          geom_point(aes(color= color), size= 10.5) +
+          geom_text(aes(label= network.vertex.names(intCOL.m1)),
+                        color= "white", size= 2.5,
+                        fontface="bold") +
+          guides(color= FALSE) +
+          theme(legend.position="none")
+COL.net
+```
+
+#SABOJI
+```{r}
+intOJI.m1 = network (intOJI, matrix.type = "bipartite", ignore.eval= FALSE, names.eval = "weights")
+
+col = c("actor" = "#dfc27d", "event" = "black")
+set.seed(92)
+
+network.vertex.names(intOJI.m1)[36:42] <- c("CHL", "APO", "MUS", "MES", "ELA", "NAN", "MEG")
+
+OJI.net<-bip_ggnet(intOJI.m1, as.matrix(intOJI), 
+                   size = 0, 
+                   shape ="mode", 
+                   palette = col, 
+                   color = "mode", 
+                   layout.exp = 0.1) + 
+    geom_point(aes(color= color), size= 12,
+                         color= "grey") +
+          geom_point(aes(color= color), size= 11,
+                         alpha= 0.5) +
+          geom_point(aes(color= color), size= 10.5) +
+          geom_text(aes(label= network.vertex.names(intOJI.m1)),
+                        color= "white", size= 2.5,
+                        fontface="bold") +
+          guides(color= FALSE) +
+          theme(legend.position="none")
+OJI.net
+```
+ 
+#SABMAR
+```{r}
+intMAR.m1 = network (intMAR, matrix.type = "bipartite", ignore.eval= FALSE, names.eval = "weights")
+
+col = c("actor" = "#8c510a", "event" = "black")
+
+network.vertex.names(intMAR.m1)[36:42] <- c("CHL", "APO", "MUS", "MES", "ELA", "NAN", "MEG")
+set.seed(92)
+MAR.net<-bip_ggnet(intMAR.m1, as.matrix(intMAR), 
+                   size = 0, 
+                   shape ="mode", 
+                   palette = col, 
+                   color = "mode", 
+                   layout.exp = 0.1) + 
+    geom_point(aes(color= color), size= 12,
+                         color= "grey") +
+          geom_point(aes(color= color), size= 11,
+                         alpha= 0.5) +
+          geom_point(aes(color= color), size= 10.5) +
+          geom_text(aes(label= network.vertex.names(intMAR.m1)),
+                        color= "white", size= 2.5,
+                        fontface="bold") +
+          guides(color= FALSE) +
+          theme(legend.position="none")
+MAR.net
+
+#3 PLOTS TOGETHER 
+library(patchwork)
+MAR.net/OJI.net/COL.net
+```
+
+```{r NETEORKS METRICS COMPUTATION}
+
+#Rounding values to reduce computation time:
+
+intALL <- round(intALL*100, digits = 0)
+intCOL <- round(intCOL*100, digits = 0)
+intOJI <- round(intOJI*100, digits = 0)
+intMAR <- round(intMAR*100, digits = 0)
+
+#Metrics estimation
+
+#COL
+intCOLmetrics<-networklevel(intCOL, weighted=TRUE,index = c("weighted connectance", "weighted NODF","H2"),nrep = 100) # Network level metrics
+intCOLmetricspecies<-specieslevel(intCOL,level="higher",index = c("degree","species strength")) #Node level metrics (animals)                    
+intCOLmetricPLANTS<-specieslevel(intCOL,level="lower",index = c("degree","species strength","closeness")) #Node level metrics (plants)     
+
+#OJI
+intOJImetrics<-networklevel(intOJI, weighted=TRUE,index = c("weighted connectance", "weighted NODF","H2"),nrep = 100) # Network level metrics
+intOJImetricspecies<-specieslevel(intOJI,level="higher",index = c("degree","species strength"))  #Node level metrics (animals)       
+intOJImetricPLANTS<-specieslevel(intOJI,level="lower",index = c("degree","species strength","closeness")) #Node level metrics (plants)  
+
+
+#MAR
+intMARmetrics<-networklevel(intMAR, weighted=TRUE,index = c("weighted connectance", "weighted NODF","H2"),nrep = 100)  # Network level metrics
+intMARmetricspecies<-specieslevel(intMAR,level="higher",index = c("degree","species strength")) #Node level metrics (animals)  
+intMARmetricPLANTS<-specieslevel(intMAR,level="lower",index = c("degree","species strength","closeness")) #Node level metrics (plants)  
+
+#ALL
+intALLmetricPLANTS<-specieslevel(intALL,level="lower",index = "species strength") #Node level metrics (plants)  
+intALLmetricPLANTS
+```
+
+```{r Creating dataframes for plots}
+
+COL<-c(rep("SABCOL", 7))
+OJI<-c(rep("SABOJI", 7))
+MAR<-c(rep("SABMAR", 7))
+area<-c(COL,OJI,MAR)
+
+#Creating dataframe for plants
+new.areaCOL<-c(rep("SABCOL", 34))
+new.areaOJI<-c(rep("SABOJI", 35))
+new.areaMAR<-c(rep("SABMAR", 34))
+new.area<-c(new.areaCOL,new.areaOJI,new.areaMAR,new.areaCOL,new.areaOJI,new.areaMAR)
+
+#For animals
+degree<-rep("degree",21)
+speciesstrength<-rep("species strength",21)
+metric<-c(degree,speciesstrength)
+
+#For plants
+metric2degree<-c(rep("degree",103))
+metric2speciesstrength<-c(rep("speciesstrength",103))
+new.metrics<-c(metric2degree,metric2speciesstrength)
+
+#For animals
+animal.names<-row.names(intCOLmetricspecies)
+animal<-rep(animal.names,6)
+
+
+#For palnts
+colo<-row.names(intCOLmetricPLANTS)
+ojil<-row.names(intOJImetricPLANTS)
+marq<-row.names(intMARmetricPLANTS)
+names<-c(colo,ojil,marq,colo,ojil,marq)
+
+#For species
+values<- c((intCOLmetricspecies$degree), (intOJImetricspecies$degree),(intMARmetricspecies$degree),(intCOLmetricspecies$species.strength),(intOJImetricspecies$species.strength),(intMARmetricspecies$species.strength))
+
+#For plants
+values2<-c((intCOLmetricPLANTS$degree),(intOJImetricPLANTS$degree),(intMARmetricPLANTS$degree),(intCOLmetricPLANTS$species.strength),(intOJImetricPLANTS$species.strength),(intMARmetricPLANTS$species.strength))
+
+dataframespecieslevel<-data.frame(AREA=area, Metric=metric, Species = animal, Value = values)
+dataframeplantlevel<-data.frame(AREA=new.area, Metric=new.metrics, Species = names, Value = values2)
+```
+
+#Modularity computation
+```{r Modularity}
+intALLt<-t(intALL)
+modintALL <- computeModules(intALLt, method="Beckett", deep= FALSE, deleteOriginalFiles= FALSE, steps= 1000, tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+modintALL
+
+intCOLt<-t(intCOL)
+modintCOL <- computeModules(intCOLt, method="Beckett", deep= FALSE, deleteOriginalFiles= FALSE, steps= 1000, tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+modintCOL
+
+
+intOJIt<-t(intOJI)
+modintOJI <- computeModules(intOJIt, method="Beckett", deep= FALSE, deleteOriginalFiles= FALSE, steps= 1000, tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+modintOJI
+
+intMARt<-t(intMAR)
+modintMAR <- computeModules(intMARt, method="Beckett", deep= FALSE, deleteOriginalFiles= FALSE, steps= 1000, tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+modintMAR
+
+# Modularity intALL likelyhood = 0.3457235
+# Modularity intCOL likelyhood = 0.2506048
+# Modularity intOJI likelyhood = 0.2822584
+# Modularity intMAR likelyhood = 0.3320767
+
+plotModuleWeb(modintALL)
+plotModuleWeb(modintCOL)
+plotModuleWeb(modintOJI)
+plotModuleWeb(modintMAR)
+```
+
+```{r Modularity significance}
+
+#For COL
+czCOLplants<-czvalues(modintCOL, weighted=TRUE, level="higher")
+czCOLplants
+czCOLanimal<-czvalues(modintCOL, weighted=TRUE, level="lower")
+czCOLanimal
+
+mymatCOL <- intCOLt
+require(bipartite)
+
+mod_obsCOL <-  0.2506048
+
+Msig <- function (mat, mlike)  {
+
+  
+    # mat is the input matrix for which M is tested
+    # mlike is the observed mean M value
+    
+    nulls <- nullmodel(mymatCOL, N=100, method=3)
+    modules.nulls <- sapply(nulls, computeModules)
+    like.nulls <- sapply(modules.nulls, function(x) x@likelihood)
+    z <- (mlike - mean(like.nulls))/sd(like.nulls)
+    p <- 2*pnorm(-abs(z))
+    cat("\n\n","P value for modularity M= ", mod_obsCOL, "\n", "\n\n",
+        "zeta=  ", z,
+        "P=  ",format(p, scientific = T),"\n\n")
+        } 
+
+Msig(mymatCOL, mod_obsCOL)
+
+#For OJI
+czOJIplants<-czvalues(modintOJI, weighted=TRUE, level="higher")
+czOJIplants
+czOJIanimal<-czvalues(modintOJI, weighted=TRUE, level="lower")
+czOJIanimal
+
+mymatOJI <- intOJIt
+require(bipartite)
+
+mod_obsOJI <-  0.2822584
+
+Msig <- function (mat, mlike)  {
+
+  
+    # mat is the input matrix for which M is tested
+    # mlike is the observed mean M value
+    
+    nulls <- nullmodel(mymatOJI, N=100, method=3)
+    modules.nulls <- sapply(nulls, computeModules)
+    like.nulls <- sapply(modules.nulls, function(x) x@likelihood)
+    z <- (mlike - mean(like.nulls))/sd(like.nulls)
+    p <- 2*pnorm(-abs(z))
+    cat("\n\n","P value for modularity M= ", mod_obsOJI, "\n", "\n\n",
+        "zeta=  ", z,
+        "P=  ",format(p, scientific = T),"\n\n")
+        } 
+
+Msig(mymatOJI, mod_obsOJI)
+
+#For MAR
+czMARplants<-czvalues(modintMAR, weighted=TRUE, level="higher")
+czMARplants
+czMARanimal<-czvalues(modintMAR, weighted=TRUE, level="lower")
+czMARanimal
+
+mymatMAR <- intMARt
+require(bipartite)
+
+mod_obsMAR <- 0.3320767
+
+Msig <- function (mat, mlike)  {
+
+  
+    # mat is the input matrix for which M is tested
+    # mlike is the observed mean M value
+    
+    nulls <- nullmodel(mymatMAR, N=100, method=3)
+    modules.nulls <- sapply(nulls, computeModules)
+    like.nulls <- sapply(modules.nulls, function(x) x@likelihood)
+    z <- (mlike - mean(like.nulls))/sd(like.nulls)
+    p <- 2*pnorm(-abs(z))
+    cat("\n\n","P value for modularity M= ", mod_obsMAR, "\n", "\n\n",
+        "zeta=  ", z,
+        "P=  ",format(p, scientific = T),"\n\n")
+        } 
+
+Msig(mymatMAR, mod_obsMAR)
+```
+
+Results:
+#INTCOL
+
+Weighted Connectance = 0.307661 
+zeta=   -7.450015
+P=    9.332962e-14 
+
+WNODF N= 39.0702  
+zeta=   -3.024829 
+P=   2.487736e-03 
+
+
+H2=  0.2728968 
+zeta=   16.07616 
+P=   3.749227e-58 
+
+#INTOJI
+
+Weighted connectance C=  0.2577812 
+zeta=   -15.73958 
+P=   8.097865e-56 
+
+WNODF N=  31.29092 
+zeta=   -5.081784 
+P=   3.739062e-07 
+
+H2=  0.3173446 
+zeta=   18.023 
+P=   1.285816e-72 
+
+
+#INTMAR
+Weighted connectance C=  0.2356121 
+zeta=   -8.734931
+P=   2.438057e-18 
+
+WNODF N=  27.96062 
+zeta=   -7.938668 
+P=   2.043635e-15 
+
+H2=  0.3234387 
+zeta=   17.92492 
+P=   7.536192e-72 
+
+## Bootstrap estimates of network parameters
+We estimated the confidence intervals by resampling interaction networks from the different methods and computing their average, SE, and CIs.
+```{r CIs_INTCOL}
+#here
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+mat <- intCOL
+mat<-as.data.frame(mat)
+intCobs<- as.vector(networklevel(mat, 
+    			  index = c("weighted connectance",
+    			  		    "weighted NODF", "H2")))
+
+# Resampling plan for bootstrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+intCmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+   intCmetrics<- as.vector(networklevel(mat1, 
+    			  index = c("weighted connectance",
+    			  		    "weighted NODF", "H2")))
+    intCmetrics_boot<- rbind(intCmetrics_boot, intCmetrics)   
+}
+	colnames(intCmetrics_boot)<- c("weighted NODF","weighted connectance", "H2")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+intCOL_boot <- as.data.frame(colMeans(intCmetrics_boot))
+rnd.se <- as.vector(apply(intCmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+intCOL_boot<- cbind(intCOL_boot, rnd.se)
+
+ci1 <-  intCobs-(1.962*intCOL_boot$rnd.se)
+ci2 <-  intCobs+(1.962*intCOL_boot$rnd.se)
+
+intCOL_boot<- cbind(intCOL_boot, ci1, ci2)
+colnames(intCOL_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+intCOL_boot<- cbind(intCobs,intCOL_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+intCOL_boot
+```
+
+```{r CIs_INTOJI}
+require(bootstrap)
+require(bipartite)
+require(sampling)
+# Bootstrap loop to create the boot matrices --------------
+
+mat <- intOJI
+mat<-as.data.frame(mat)
+intOobs<- as.vector(networklevel(mat, 
+    			  index = c("weighted connectance",
+    			  		    "weighted NODF","H2")))
+
+# Resampling plan for bootstrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+intOmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+   intOmetrics<- as.vector(networklevel(mat1, 
+    			  index = c("weighted connectance",
+    			  		    "weighted NODF", "H2")))
+    intOmetrics_boot<- rbind(intOmetrics_boot, intOmetrics)   
+}
+	colnames(intOmetrics_boot)<- c("weighted NODF","weighted connectance", "H2")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+intOJI_boot <- as.data.frame(colMeans(intOmetrics_boot))
+rnd.se <- as.vector(apply(intOmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+intOJI_boot<- cbind(intOJI_boot, rnd.se)
+
+ci1 <-  intOobs-(1.962*intOJI_boot$rnd.se)
+ci2 <-  intOobs+(1.962*intOJI_boot$rnd.se)
+
+intOJI_boot<- cbind(intOJI_boot, ci1, ci2)
+colnames(intOJI_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+intOJI_boot<- cbind(intOobs,intOJI_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+intOJI_boot
+```
+
+```{r CIs_INTMAR}
+#
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+mat <- intMAR
+mat<-as.data.frame(mat)
+intMobs<- as.vector(networklevel(mat, 
+    			  index = c("weighted connectance",
+    			  		    "weighted NODF","H2")))
+
+# Resampling plan for bootstrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+intMmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+   intMmetrics<- as.vector(networklevel(mat1, 
+    			  index = c("weighted connectance",
+    			  		    "weighted NODF", "H2")))
+    intMmetrics_boot<- rbind(intMmetrics_boot, intMmetrics)   
+}
+	colnames(intMmetrics_boot)<- c("weighted NODF","weighted connectance", "H2")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+intMAR_boot <- as.data.frame(colMeans(intMmetrics_boot))
+rnd.se <- as.vector(apply(intMmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+intMAR_boot<- cbind(intMAR_boot, rnd.se)
+
+ci1 <-  intMobs-(1.962*intMAR_boot$rnd.se)
+ci2 <-  intMobs+(1.962*intMAR_boot$rnd.se)
+
+intMAR_boot<- cbind(intMAR_boot, ci1, ci2)
+colnames(intMAR_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+intMAR_boot<- cbind(intMobs,intMAR_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+intMAR_boot
+
+```
+
+## Functions to load
+### Function to estimate M from bootstrapped matrices.
+```{r m_boot.function}
+# Function for Bootstrap loop to estimate M for resampled matrices. ------------
+# USE WITH: m_boot(mymat, myresamp). myresamp defaults to 99.
+m_boot <- function (mymat, myresamp= 99)  {
+	TIME <- Sys.time()
+	# Resampling plan for bootstrapping n=99 adjacency matrices.
+	m.boot<- NULL
+	# mat is the input matrix for which M is tested
+	# mlike is the observed mean M value (in general, mat@likelihood)
+	# The loop. PUT THIS IN A BOOT LOOP 
+	for (i in 1:myresamp) {
+		mat1 <- sample_frac(mymat, 0.8, replace= T)
+		mnmetrics <- computeModules(mat1, method="Beckett", 
+								   deep= FALSE, deleteOriginalFiles= FALSE, 
+								   steps= 1000, tolerance= 1e-10, 
+								   experimental= FALSE, forceLPA= FALSE)
+		m.boot<- rbind(m.boot, mnmetrics@likelihood)   
+	}
+	colnames(m.boot)<- c("MBoot") # m.boot saves the M values for bootstrapped 
+								  # matrices.
+	return(m.boot)
+	#
+	Sys.time() - TIME
+	#
+} 
+
+```
+
+
+```{r COL Modularity CI}
+M_COL <- computeModules(intCOL, method="Beckett", deep= FALSE, 
+					   deleteOriginalFiles= FALSE, steps= 1000, 
+					   tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+intCOL<-as.data.frame(intCOL)
+M_COL@likelihood
+
+MObs<- M_COL@likelihood
+
+COL_Mboot <- as.data.frame(cbind(MObs, # colMeans(m.boot)))
+									 colMeans(m.boot<-m_boot(intCOL, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+COL_Mboot<- cbind(COL_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*COL_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*COL_Mboot$rnd.se)
+
+
+COL_Mboot<- cbind(COL_Mboot, ci1, ci2)
+colnames(COL_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								  "CI_low",
+								  "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+COL_Mboot
+
+```
+
+```{r OJI MODULARITY CI}
+M_OJI <- computeModules(intOJI, method="Beckett", deep= FALSE, 
+					   deleteOriginalFiles= FALSE, steps= 1000, 
+					   tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+intOJI<-as.data.frame(intOJI)
+M_OJI@likelihood
+
+MObs<- M_OJI@likelihood
+
+OJI_Mboot <- as.data.frame(cbind(MObs, # colMeans(m.boot)))
+									 colMeans(m.boot<-m_boot(intOJI, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+OJI_Mboot<- cbind(OJI_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*OJI_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*OJI_Mboot$rnd.se)
+
+
+OJI_Mboot<- cbind(OJI_Mboot, ci1, ci2)
+colnames(OJI_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								  "CI_low",
+								  "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+OJI_Mboot
+
+```
+
+```{r MAR MODULARITY CI}
+M_MAR <- computeModules(intMAR, method="Beckett", deep= FALSE, 
+					   deleteOriginalFiles= FALSE, steps= 1000, 
+					   tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+intMAR<-as.data.frame(intMAR)
+M_MAR@likelihood
+
+MObs<- M_MAR@likelihood
+
+MAR_Mboot <- as.data.frame(cbind(MObs, # colMeans(m.boot)))
+									 colMeans(m.boot<-m_boot(intMAR, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+MAR_Mboot<- cbind(MAR_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*MAR_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*MAR_Mboot$rnd.se)
+
+
+MAR_Mboot<- cbind(MAR_Mboot, ci1, ci2)
+colnames(MAR_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								  "CI_low",
+								  "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+MAR_Mboot
+```
+
+#Hamming Distances:
+```{r Hamming distances}
+library(network)
+library(sna)
+
+dim(intMAR)
+dim(intOJI)
+dim(intCOL)
+
+
+rowSums(intMAR)
+rowSums(intOJI)
+rowSums(intCOL)
+
+wMAR <- intMAR     # dim 35x7  
+wOJI <- intOJI     # dim 35x7 
+wCOL <- intCOL     # dim 35x7
+
+wMAR<- as.data.frame(intMAR)
+wOJI<- as.data.frame(intOJI)
+wCOL<- as.data.frame(intCOL)
+
+#I delete plants without interactions
+
+wMAR<- wMAR %>%  dplyr::filter(rowSums(wMAR^2)!=0) 
+dim(wMAR)    # 34x7
+
+wOJI<- wOJI %>%  dplyr::filter(rowSums(wOJI^2)!=0) 
+dim(wOJI)    # 35x7                                 ¡¡ UNA PLANTA MÁS !!
+
+wCOL<- wCOL %>%  dplyr::filter(rowSums(wCOL^2)!=0) 
+dim(wCOL)    # 34x7
+
+# I transform the matrices to the same size = 34x7
+set.seed(99) 
+rOJI<- sample_n(wOJI, 34, replace= F)   # I randomly select 34 plants (without replacement) in OJI, to eliminate one.
+dim(wMAR)
+dim(rOJI)
+dim(wCOL) 
+
+# I generate the graph object
+net.wMAR<- graph_from_incidence_matrix(wMAR, weighted= T, add.names=NULL)
+net.rOJI<- graph_from_incidence_matrix(rOJI, weighted= T, add.names=NULL) 
+net.wCOL<- graph_from_incidence_matrix(wCOL, weighted= T, add.names=NULL) 
+
+mat.wMAR <- get.adjacency(net.wMAR, attr = "weight")
+mat.rOJI <- get.adjacency(net.rOJI, attr = "weight")
+mat.wCOL <- get.adjacency(net.wCOL, attr = "weight")
+
+grMAR <- network::as.network(as.matrix(mat.wMAR), directed=FALSE, bipartite=22, ignore.eval=FALSE, names.eval='weight')
+grOJI <- network::as.network(as.matrix(mat.rOJI), directed=FALSE, bipartite=22, ignore.eval=FALSE, names.eval='weight')
+grCOL <- network::as.network(as.matrix(mat.wCOL), directed=FALSE, bipartite=22, ignore.eval=FALSE, names.eval='weight')
+
+# OJI-MAR Comparison
+
+junipA<- base::array(dim=c(2,34,7))
+junipA[1,,]<- as.matrix(rOJI)
+junipA[2,,]<- as.matrix(wMAR)
+
+q.junipA <- qaptest(junipA,hdist,g1=1,g2=2)
+summary(q.junipA)
+
+#OJI-COL Comparison
+junipB<- base::array(dim=c(2,34,7))
+junipB[1,,]<- as.matrix(rOJI)
+junipB[2,,]<- as.matrix(wCOL)
+
+q.junipB <- qaptest(junipB,hdist,g1=1,g2=2)
+summary(q.junipB)
+
+# MAR-COL Comparison
+junipC<- base::array(dim=c(2,34,7))
+junipC[1,,]<- as.matrix(wMAR)
+junipC[2,,]<- as.matrix(wCOL)
+
+q.junipC <- qaptest(junipC,hdist,g1=1,g2=2)
+summary(q.junipC)
+
+# Creating results table
+networkpair<-c("OJI-MAR", "OJI-COL", "MAR-COL")
+distance<-c(q.junipA$testval,q.junipB$testval,q.junipC$testval)
+
+hammingdistanceresults<-data.frame(NETWORKS_PAIR = networkpair, Hamming_distance= distance)
+kable(hammingdistanceresults)
+```
+
+#Plotting network statistics
+```{r Species level}
+#dataframespecieslevel
+
+dataframestrength<-dataframespecieslevel[22:42,]
+
+
+dataframestrength$AREA<-recode_factor(dataframestrength$AREA, SABMAR ="ASABMAR",SABOJI = "BSABOJI")
+dataframeplantlevel$AREA<-recode_factor(dataframeplantlevel$AREA, SABMAR ="ASABMAR",SABOJI = "BSABOJI")
+#levels(dataframestrength$AREA)
+#levels(dataframeplantlevel$AREA)
+
+dataframespecieslevel$AREA<-as.factor(dataframespecieslevel$AREA)
+dataframespecieslevel$Metric<-as.factor(dataframespecieslevel$Metric)
+dataframespecieslevel$Species<-as.factor(dataframespecieslevel$Species)
+dataframespecieslevel$Value<-as.numeric(dataframespecieslevel$Value)
+
+
+dataframeplantlevel$AREA<-as.factor(dataframeplantlevel$AREA)
+dataframeplantlevel$Metric<-as.factor(dataframeplantlevel$Metric)
+dataframeplantlevel$Species<-as.factor(dataframeplantlevel$Species)
+dataframeplantlevel$Value<-as.numeric(dataframeplantlevel$Value)
+
+
+dataframestrength$Species<-recode_factor(dataframestrength$Species, fa_4cone_chl ="1verderon")
+dataframestrength$Species<-recode_factor(dataframestrength$Species, fa_mus ="2mus")
+dataframestrength$Species<-recode_factor(dataframestrength$Species, fa_apo ="3apo")
+dataframestrength$Species<-recode_factor(dataframestrength$Species, fa_apo ="3apo")
+
+PLOT_STRENGTH<-ggplot(data=dataframestrength, aes(x=AREA, y=Value, fill=Species)) +
+  geom_bar(stat="identity", position=position_dodge())+ 
+theme_minimal()+ scale_fill_manual("legend", values = c( "#00441b", "#74c476" ,"#238b45","#cc4c02" ,"#662506" ,"#ec7014" , "#fee391"))+ ggtitle("SPECIES STRENGTH") + theme(legend.position="top")
+
+
+
+PLOT_STRENGTH #I edit some aspect of this plot in illustrator. 
+
+
+plants_degree<-dataframeplantlevel[1:103,]
+plants_strength<-dataframeplantlevel[104:206,]
+plants_strength<-plants_strength[order(plants_strength$Value),]
+
+intCOLmetricPLANTS<-intCOLmetricPLANTS[order(intCOLmetricPLANTS$species.strength,decreasing =  TRUE),]
+COL_PLANT_STRENGTH<-(intCOLmetricPLANTS$species.strength)
+COL_PLANT_names<-c("C075", "C024", "C083", "C150", "C140", "C126" ,"C106","C285" ,"C057" ,"C054", "C065" ,"C176", "C017", "C316" ,"C014", "C172", "C050" ,"C002", "C165", "C131", "C174", "C056", "C141" ,"C121" ,"C168", "C086" ,"C153", "C162" ,"C193", "C107" ,"C119" ,"C018", "C055" ,"C111")
+
+barplot(COL_PLANT_STRENGTH, names.arg=COL_PLANT_names, las=2, cex.names=0.6,ylim = c(0, 1), xlab = "Individual Plants", ylab = "Node Strength", main = "COL")
+
+
+
+intOJImetricPLANTS<-intOJImetricPLANTS[order(intOJImetricPLANTS$species.strength,decreasing =  TRUE),]
+OJI_PLANT_STRENGTH<-(intOJImetricPLANTS$species.strength)
+OJI_PLANT_names<-c("O580", "O304", "O067" ,"O042", "O766" ,"O334", "O148", "O514", "O072" ,"O682", "O137" ,"O054", "O123", "O642", "O112", "O685", "O023" ,"O314" ,"O231", "O582", "O105" ,"O008" ,"O045" ,"O352", "O621" ,"O384", "O006" ,"O268", "O839" ,"O626", "O553", "O463", "O136", "O241", "O488")
+
+barplot(OJI_PLANT_STRENGTH, names.arg=OJI_PLANT_names, las=2, cex.names=0.6,ylim = c(0, 1), xlab = "Individual Plants", ylab = "Node Strength", main = "OJI")
+
+intMARmetricPLANTS<-intMARmetricPLANTS[order(intMARmetricPLANTS$species.strength,decreasing =  TRUE),]
+
+
+MAR_PLANT_STRENGTH<-(intMARmetricPLANTS$species.strength)
+MAR_PLANT_names<-c("M956", "M087", "M849", "M144", "M664", "M581", "M843", "M826", "M694" ,"M749" ,"M136" ,"M215" ,"M381" ,"M460" ,"M058" ,"M986" ,"M315", "M541", "M520" ,"M029" ,"M531" ,"M036", "M648", "M304", "M457", "M207" ,"M820", "M702", "M847", "M208", "M176", "M065" ,"M219", "M518")
+barplot(MAR_PLANT_STRENGTH, names.arg=MAR_PLANT_names, las=2, cex.names=0.6,ylim = c(0, 1), xlab = "Individual Plants", ylab = "Node Strength", main = "MAR")
+```
+# I bring the results of network level metrics to gather all the plots into one which will be: Figure 4
+```{r NETWORK-LEVEL METRICS DATAFRAME INMPUT}
+library(readr)
+
+tabletoplot <- read_delim ("~/Documents/GitHub/JEcology_Isla2022/data/tableSMS4toplot.csv", ";", escape_double = FALSE, col_types = cols(WC = col_number(), 
+        WC_min = col_number(), WC_max = col_number(), 
+        WNODF = col_number(), WNODF_min = col_number(), 
+        WNODF_max = col_number(), M = col_number(), 
+        M_min = col_number(), M_max = col_number(), 
+        H2 = col_number(), H2_min = col_number(), 
+        H2_MAX = col_number()),trim_ws = TRUE)
+
+
+tabletoplot<-as.data.frame(tabletoplot)
+tabletoplot$area<-as.factor(tabletoplot$area)
+
+levels (tabletoplot$area)
+
+tabletoplot <- tabletoplot %>% mutate(area = factor(area, levels = c( "SABMAR", "SABOJI","SABCOL")))
+
+tabletoplot$area = factor(tabletoplot$area, levels=c("SABMAR", "SABOJI", "SABCOL"))
+
+
+levels(tabletoplot$area)
+
+sabcolors <- c("SABCOL"="#35978f", "SABOJI"="#dfc27d", "SABMAR"="#8c510a")
+
+p1<-ggplot(tabletoplot, aes(x=factor(area), y=WC, color= area)) + 
+    geom_point(size=3) +
+    geom_errorbar(aes(ymin =WC_min, ymax=WC_max), width = 0.3, size = 0.75) + 
+    theme_classic() +
+    labs(x = "area",y = "WC") +
+    scale_color_manual(values=sabcolors) +
+    theme(axis.title.x = element_blank(), axis.text.x = element_blank(),legend.position = "none")
+
+
+p2<-ggplot(tabletoplot, aes(x=factor(area), y=WNODF, color= area)) + 
+    geom_point(size=3) +
+    geom_errorbar(aes(ymin =WNODF_min, ymax=WNODF_max), width = 0.3, size = 0.75) + 
+    theme_classic() +
+    labs(x = "area",y = "WNODF") +
+    scale_color_manual(values=sabcolors) +
+    theme(axis.title.x = element_blank(), axis.text.x = element_blank(), legend.position = "none")
+
+
+p3<-ggplot(tabletoplot, aes(x=factor(area), y=M, color= area)) + 
+    geom_point(size=3) +
+    geom_errorbar(aes(ymin =M_min, ymax=M_max), width = 0.3, size = 0.75) + 
+    theme_classic() +
+    labs(x = "area",y = "M") +
+    scale_color_manual(values=sabcolors)  +
+    theme(legend.position = "none")
+
+
+p4<-ggplot(tabletoplot, aes(x=factor(area), y=H2, color= area)) + 
+    geom_point(size=3) +
+    geom_errorbar(aes(ymin =H2_min, ymax=H2_MAX), width = 0.3, size = 0.75) + 
+    theme_classic() +
+    labs(x = "area",y = "H2") +
+    scale_color_manual(values=sabcolors)  +
+    theme(legend.position = "none")
+
+
+library(patchwork)
+
+PLOT_STRENGTH/(p1+ p2 +p3 )
+```
+
+INTERACTION STRENGTH AND PREVALENCE PLOT
+```{r INTERACTION STRENGTH AND PREVALENCE PLOT}
+Prev_Ant <- read_delim ("~/Documents/GitHub/JEcology_Isla2022/data/Prev_Ant.csv", ",", escape_double = FALSE, trim_ws = TRUE)
+
+p_jorge_Mar<-effectiveness_plot(q1=Prev_Ant$M_prev,q2=Prev_Ant$M_int, 
+                                    q2.error =Prev_Ant$SE_M,pts.color= Prev_Ant$Species,pts.size=4, nlines=12,
+                                    myxlab= "Prevalence (%)",
+                                    myylab="Intensity (%)")+xlim(0,115)+ ggtitle("MAR")
+
+p_jorge_Oji<-effectiveness_plot(q1=Prev_Ant$O_prev,q2=Prev_Ant$O_int, 
+                                q2.error =Prev_Ant$SE_O,pts.color= Prev_Ant$Species,pts.size=4, nlines=12,
+                                myxlab= "Prevalence (%)",
+                                myylab="Intensity (%)")+xlim(0,115)+ggtitle("OJI")
+
+p_jorge_Col<-effectiveness_plot(q1=Prev_Ant$C_prev,q2=Prev_Ant$C_int, 
+                                q2.error =Prev_Ant$SE_C,pts.color= Prev_Ant$Species,pts.size=4, nlines=12,
+                                myxlab= "Prevalence (%)",
+                                myylab="Intensity (%)")+xlim(0,115)+ggtitle("COL")
+```
+

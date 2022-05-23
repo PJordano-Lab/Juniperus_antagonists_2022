@@ -1,0 +1,272 @@
+---
+title: "data_exploration"
+author: "Jorge"
+date: "3/14/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+ # Trait and interactions data exploration. 
+
+```{r Packages loading}
+library(readr)
+library(tibble)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+library(tidyverse)
+library(factoextra)
+library(ggfortify)
+library(knitr)
+library(corrplot)
+```
+
+
+```{r data loading}
+data <- read_delim ("~/Documents/GitHub/JEcology_Isla2022/data/dataset.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+
+data<-column_to_rownames(data, var = "tree")%>% 
+  mutate(area = factor(area, levels = c("SABMAR", "SABOJI", "SABCOL"))) # tree identification to row names.
+
+# Aquí puedo cambiar el numbre del factor "area" si quiero (me vale para jugar con intercept) # # #
+data$area<-recode_factor(data$area, SABMAR = "MAR",  SABOJI ="OJI", SABCOL ="COL")
+levels(data$area)
+
+data$d1 <- as.numeric(data$d1)
+data$d2 <- as.numeric(data$d2)
+data$h <- as.numeric(data$h)
+data$cover <- as.numeric(data$cover)
+data$collapsed_cropsize <- as.numeric(data$collapsed_cropsize)
+data$neighboiurhood_cropsize <- as.numeric(data$neighboiurhood_cropsize)
+
+data$long <- as.numeric(data$long)
+data$diam <- as.numeric(data$diam)
+data$cowe <- as.numeric(data$cowe)
+data$nseed <- as.numeric(data$nseed)
+data$totalseedw <- as.numeric(data$totalseedw)
+data$oneseedw <- as.numeric(data$oneseedw)
+data$fweight <- as.numeric(data$fweight)
+data$sunken <- as.numeric(data$sunken)
+
+data$neighboiurhood_cropsize <- as.numeric(data$neighboiurhood_cropsize)
+data$n_neigh <- as.numeric(data$n_neigh)
+
+data$fa_4cone_chl <- as.numeric(data$fa_4cone_chl)
+data$fa_apo <- as.numeric(data$fa_apo)
+data$fa_mus <- as.numeric(data$fa_mus)
+data$fa_mesophleps <- as.numeric(data$fa_mesophleps)
+data$fa_elachista <- as.numeric(data$fa_elachista)
+data$fa_nanodiscus <- as.numeric(data$fa_nanodiscus)
+data$fa_megastigmus <- as.numeric(data$fa_megastigmus)
+data$x_lat <- as.numeric(data$x_lat)
+data$y_long <- as.numeric(data$y_long)
+```
+
+
+```{r Color fix}
+sabcolors <- c("MAR"="#8c510a", "OJI"="#dfc27d", "COL"="#35978f")
+```
+
+#Box-plots Individual traits
+```{r Box plots -  Individual traits}
+
+box_plot1 <- ggplot(data, aes(x = area, y = d1, color = area))  + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "PLANT DIAMETER 1", x = "")+ theme(legend.position = "none")
+
+box_plot2 <- ggplot(data, aes(x = area, y = d2, color = area))+ stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "PLANT DIAMETER 2", x = "")+ theme(legend.position = "none")
+
+box_plot3 <- ggplot(data, aes(x = area, y = h, color = area))+ stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "PLANT HEIGHT", x = "")+ theme(legend.position = "none")
+
+box_plot4 <- ggplot(data, aes(x = area, y = cover, color = area))+ stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() +labs(y = "PLANT COVER", x = "")+ theme(legend.position = "none")
+
+box_plot5 <- ggplot(data, aes(x = area, y = collapsed_cropsize, color = area))+ stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "PLANT CROP SIZE", x = "")+ theme(legend.position = "none")
+
+
+
+(box_plot1 + box_plot2)/(box_plot3+box_plot4)/(box_plot5)
+
+```
+
+#Box-plots Cone traits
+```{r Box plots -  Cone traits}
+
+
+box_plot1 <- ggplot(data, aes(x = area, y = long, color = area))   + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "CONE LENGTH", x = "")+ theme(legend.position = "none")
+
+
+box_plot2 <- ggplot(data, aes(x = area, y = diam, color = area))   + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "CONE DIAMETER", x = "")+ theme(legend.position = "none")
+
+
+
+box_plot3 <- ggplot(data, aes(x = area, y = cowe, color = area))   + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "CONE MASS", x = "")+ theme(legend.position = "none")
+  
+  
+ 
+box_plot4  <- ggplot(data, aes(x = area, y = nseed, color = area))   + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "NUMBER OF SEEDS", x = "")+ theme(legend.position = "none")
+  
+
+box_plot5  <- ggplot(data, aes(x = area, y = totalseedw, color = area))  + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "TOTAL SEED MASS", x = "")+ theme(legend.position = "none")
+
+
+box_plot6 <- ggplot(data, aes(x = area, y = oneseedw, color = area))  + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() +labs(y = "MEAN ONE SEED MASS", x = "")+ theme(legend.position = "none")
+
+
+box_plot7 <- ggplot(data, aes(x = area, y = fweight, color = area))   + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "PULP MASS", x = "")+ theme(legend.position = "none")
+
+box_plot8 <- ggplot(data, aes(x = area, y = sunken, color = area))  + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "SEED VIABILITY", x = "")+ theme(legend.position = "none")
+
+
+(box_plot1 + box_plot2)/(box_plot3+box_plot4)/(box_plot5 +box_plot6)/(box_plot7 +box_plot8)
+```
+
+#Box-plots Neigh attributes
+```{r Box plots -  Neigh attributes}
+
+box_plot1 <- ggplot(data, aes(x = area, y = n_neigh, color = area)) + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "JUNIPER NEIGHBORHOOD DENSITY", x = "")+ theme(legend.position = "none")
+
+box_plot2 <- ggplot(data, aes(x = area, y = neighboiurhood_cropsize, color = area)) + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "JUNIPER NEIGHBORHOOD FECUNDITY", x = "")+ theme(legend.position = "none")
+
+
+#box_plot3 <-ggplot(data, aes(x = area, y = neighboiurhood_cropsize, color = area)) +
+#  geom_sina(aes(color = area), size = 2)+
+#  scale_color_manual(values=sabcolors)+
+#  geom_jitter(width =0.05)  + theme_light() + labs(y = "JUNIPER NEIGHBORHOOD FECUNDITY", x = "")+ # theme(legend.position = "none")
+
+(box_plot1 + box_plot2)
+```
+
+#Box-plots Interaction frequency
+```{r Box plots -  Interaction frequency}
+
+
+box_plot1 <- ggplot(data, aes(x = area, y = fa_apo, color = area)) + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "Apodemus sylvaticus", x = "")+ theme(legend.position = "none")
+
+
+box_plot2 <- ggplot(data, aes(x = area, y = fa_mus, color = area)) + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "Mus spretus", x = "")+ theme(legend.position = "none")
+
+
+
+box_plot3 <- ggplot(data, aes(x = area, y = fa_mesophleps, color = area)) + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() +labs(y = "Mesophleps oxycedrella", x = "")+ theme(legend.position = "none")
+  
+  
+ 
+box_plot4  <- ggplot(data, aes(x = area, y = fa_elachista, color = area)) + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "Elachista sp.", x = "")+ theme(legend.position = "none")
+  
+
+box_plot5  <- ggplot(data, aes(x = area, y = fa_nanodiscus, color = area)) + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "Nanodiscus transversus", x = "")+ theme(legend.position = "none")
+
+
+box_plot6 <- ggplot(data, aes(x = area, y = fa_megastigmus, color = area)) + stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "Megastigmus amicorum", x = "")+ theme(legend.position = "none")
+
+
+box_plot7 <- ggplot(data, aes(x = area, y = fa_4cone_chl, color = area))+ stat_boxplot(width =0.25) +
+scale_color_manual(values=sabcolors) +
+  geom_jitter(width =0.10)  + theme_light() + labs(y = "Chloris chloris", x = "")+ theme(legend.position = "none")
+
+
+
+(box_plot7)/(box_plot1 + box_plot2)/(box_plot3+box_plot4)/(box_plot5 +box_plot6)
+```
+
+#Plants PCA
+```{r Individual PCA}
+pca_dataind<-data[,c(1,2,3,4,5,6)]
+pca_dataind<-pca_dataind[,-1]
+
+res.pcaind <- prcomp(pca_dataind, scale = TRUE)
+
+#res.pcaind
+#biplot(x = res.pca,scale = 0, cex = 0.6, col = c("blue4", "brown3"))
+
+autoplot(res.pcaind, data = data, colour =  "area", loadings =TRUE, loadings.colour = "orange",  loadings.label = TRUE, loadings.label.size = 6, frame.type = 'norm')
+
+```
+#Cone  PCA
+```{r Cone PCA}
+pca_datacon<-data[,c(1,9,10,11,12,13,14,15,16)]# Borro las métricas que no sean químicas y también el % humedad
+pca_datacon<-pca_datacon[,-1]
+
+res.pcacon <- prcomp(pca_datacon, scale = TRUE)
+
+#res.pcacon
+autoplot(res.pcacon, data = data, colour =  "area", loadings =TRUE, loadings.colour = "orange",  loadings.label = TRUE, loadings.label.size = 5, frame.type = 'norm')
+
+```
+
+#Plants PCA
+```{r Plant PCA}
+pca_dataplan<-data[,c(1,2,3,4,5,6, 9,10,11,12,13,14,15,16)]
+pca_dataplan<-pca_dataplan[,-1]
+
+res.pcaplan <- prcomp(pca_dataplan, scale = TRUE)
+
+#res.pcaplan
+autoplot(res.pcaplan, data = data,label =TRUE, colour =  "area", loadings =TRUE, loadings.colour = "orange",  loadings.label = TRUE, loadings.label.size = 3, frame.type = 'norm')
+```
+
+#Neigh PCA
+```{r Neigh PCA}
+pca_datanei<-data[,c(1,7,8)]
+pca_datanei<-pca_datanei[,-1]
+
+res.pcanei <- prcomp(pca_datanei, scale = TRUE)
+
+#res.pcaplan
+autoplot(res.pcanei, data = data,label = TRUE, colour =  "area", loadings =TRUE, loadings.colour = "orange",  loadings.label = TRUE, loadings.label.size = 3, frame.type = 'norm')
+```
+#Complete PCA
+
+```{r Plant PCA}
+pca_datacomplete<-data[,c(1,2,4,6,7,8,10,12,14,16)]
+pca_datacomplete<-pca_datacomplete[,-1]
+
+res.pcapcomplete <- prcomp(pca_datacomplete, scale = TRUE)
+
+#res.pcaplan
+autoplot(res.pcapcomplete, data = data,label = TRUE, colour =  "area", loadings =TRUE, loadings.colour = "orange",  loadings.label = TRUE, loadings.label.size = 3, frame.type = 'norm')
+```
+

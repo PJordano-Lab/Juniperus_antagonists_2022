@@ -1,0 +1,517 @@
+---
+title: "ERGM"
+author: "Jorge"
+date: "3/14/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Packages loading
+
+```{r initialize, message= FALSE, warning=FALSE}
+library(sand)
+library(robustbase)
+library(igraph)
+library(ggplot2)
+library(dplyr)
+library(maditr)
+library(textshape)
+library(VIF)
+library(bipartite)
+library(sjstats)
+library(Hmisc)
+library(network)
+library(nlme)
+library(ergm.count)
+library(readr)
+library(mvtnorm)
+library(ggstance)
+library(jtools)
+library(tibble)
+library(broom.mixed)
+library(jtools)
+library(patchwork)
+require(ergm.count)
+```
+
+# Data loading
+
+```{r Data loading, message= FALSE, warning=FALSE}
+data <- read_delim ("~/Documents/GitHub/JEcology_Isla2022/data/dataset.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+require(tibble)
+data<-column_to_rownames(data, var = "tree")%>% 
+  mutate(area = factor(area, levels = c("SABCOL", "SABOJI", "SABMAR"))) # tree identification to row names.
+sabcolors <- c("SABCOL"="#35978f", "SABOJI"="#dfc27d", "SABMAR"="#8c510a") # color fix
+```
+
+# Data to numeric, round, and splitting per stand
+```{r Data to numeric, round, and splitting per stand}
+
+#Traits to numeric
+data$d1                            <- as.numeric(data$d1) 
+data$h                             <- as.numeric(data$h) 
+data$collapsed_cropsize            <- as.numeric(data$collapsed_cropsize) 
+data$diam                          <- as.numeric(data$diam) 
+data$nseed                         <- as.numeric(data$nseed) 
+data$oneseedw                      <- as.numeric(data$oneseedw)
+data$sunken                        <- as.numeric(data$sunken)
+
+data$neighboiurhood_cropsize       <- as.numeric(data$neighboiurhood_cropsize)
+data$n_neigh                       <- as.numeric(data$n_neigh)
+
+data$area                          <- as.factor(data$area)
+
+#Interactions to numeric
+data$fa_4cone_chl      <- as.numeric(data$fa_4cone_chl)
+data$fa_apo            <- as.numeric(data$fa_apo)
+data$fa_mus            <- as.numeric(data$fa_mus)
+data$fa_elachista      <- as.numeric(data$fa_elachista)
+data$fa_mesophleps     <- as.numeric(data$fa_mesophleps)
+data$fa_nanodiscus     <- as.numeric(data$fa_nanodiscus)
+data$fa_megastigmus    <- as.numeric(data$fa_megastigmus)
+
+
+# Splitting per area
+
+dataCOL<-data[c(1:35),]
+dataOJI<-data[c(71:105),]
+dataMAR<-data[c(36:70),]
+
+#Selecting interactions rows
+int<-data %>% 
+           dplyr::select(17,18,19,20,21,22,23)
+intCOL <- dataCOL %>% 
+           dplyr::select(17,18,19,20,21,22,23)
+intOJI <- dataOJI %>% 
+           dplyr::select(17,18,19,20,21,22,23)
+intMAR <- dataMAR %>% 
+           dplyr::select(17,18,19,20,21,22,23)
+
+#Round to avoid computation problems
+int <- round(int*100, digits = 0)
+intCOL <- round(intCOL*100, digits = 0)
+intOJI <- round(intOJI*100, digits = 0)
+intMAR <- round(intMAR*100, digits = 0)
+
+#Check dimensions, names and plants for stand
+#dim(int)
+#dim(intCOL)
+#dim(intOJI)
+#dim(intMAR)
+#names(int)
+#names(intCOL)
+#names(intOJI)
+#names(intMAR)
+#row.names(int)
+#row.names(intCOL)
+#row.names(intOJI)
+#row.names(intMAR)
+```
+# Igraph object creation
+```{r Igraph object creation}
+net.int<- graph_from_incidence_matrix(int, weighted= T, add.names=NULL) 
+net.COL<- graph_from_incidence_matrix(intCOL, weighted= T, add.names=NULL) 
+net.OJI<- graph_from_incidence_matrix(intOJI, weighted= T, add.names=NULL)
+net.MAR<- graph_from_incidence_matrix(intMAR, weighted= T, add.names=NULL) 
+class(net.int)
+```
+
+# Creation of attribute dataset, scaling, and assigning them to each igraph object
+```{r Creation of attribute dataset, scaling, and assigning them to each igraph object, message= FALSE, warning=FALSE}
+
+#traits dataset fix
+node.traits <- data %>%  
+           dplyr::select(c(1, 2,4,6,7,8,10,12,14,16))
+node.traits.COL <- dataCOL %>%  
+           dplyr::select(c(1, 2,4,6,7,8,10,12,14,16))
+node.traits.OJI <- dataOJI %>%  
+           dplyr::select(c(1, 2,4,6,7,8,10,12,14,16))
+node.traits.MAR <- dataMAR %>%  
+           dplyr::select(c(1, 2,4,6,7,8,10,12,14,16))
+
+#Scaling traits
+
+#Big-picture
+node.traits$d1                       <- scale(node.traits$d1)
+node.traits$h                        <- scale(node.traits$h)
+node.traits$collapsed_cropsize       <- scale(node.traits$collapsed_cropsize)
+node.traits$diam                     <- scale(node.traits$diam)
+node.traits$nseed                    <- scale(node.traits$nseed)
+node.traits$sunken                   <- scale(node.traits$sunken)
+node.traits$oneseedw                 <- scale(node.traits$oneseedw)
+node.traits$sunken                   <- scale(node.traits$sunken)
+node.traits$neighboiurhood_cropsize  <- scale(node.traits$neighboiurhood_cropsize)
+node.traits$n_neigh                  <- scale(node.traits$n_neigh)
+#COL
+node.traits.COL$d1                       <- scale(node.traits.COL$d1)
+node.traits.COL$h                        <- scale(node.traits.COL$h)
+node.traits.COL$collapsed_cropsize       <- scale(node.traits.COL$collapsed_cropsize)
+node.traits.COL$diam                     <- scale(node.traits.COL$diam)
+node.traits.COL$nseed                    <- scale(node.traits.COL$nseed)
+node.traits.COL$sunken                   <- scale(node.traits.COL$sunken)
+node.traits.COL$oneseedw                 <- scale(node.traits.COL$oneseedw)
+node.traits.COL$sunken                   <- scale(node.traits.COL$sunken)
+node.traits.COL$neighboiurhood_cropsize  <- scale(node.traits.COL$neighboiurhood_cropsize)
+node.traits.COL$n_neigh                  <- scale(node.traits.COL$n_neigh)
+#OJI
+node.traits.OJI$d1                       <- scale(node.traits.OJI$d1)
+node.traits.OJI$h                        <- scale(node.traits.OJI$h)
+node.traits.OJI$collapsed_cropsize       <- scale(node.traits.OJI$collapsed_cropsize)
+node.traits.OJI$diam                     <- scale(node.traits.OJI$diam)
+node.traits.OJI$nseed                    <- scale(node.traits.OJI$nseed)
+node.traits.OJI$sunken                   <- scale(node.traits.OJI$sunken)
+node.traits.OJI$oneseedw                 <- scale(node.traits.OJI$oneseedw)
+node.traits.OJI$sunken                   <- scale(node.traits.OJI$sunken)
+node.traits.OJI$neighboiurhood_cropsize  <- scale(node.traits.OJI$neighboiurhood_cropsize)
+node.traits.OJI$n_neigh                  <- scale(node.traits.OJI$n_neigh)
+#MAR
+node.traits.MAR$d1                       <- scale(node.traits.MAR$d1)
+node.traits.MAR$h                        <- scale(node.traits.MAR$h)
+node.traits.MAR$collapsed_cropsize       <- scale(node.traits.MAR$collapsed_cropsize)
+node.traits.MAR$diam                     <- scale(node.traits.MAR$diam)
+node.traits.MAR$nseed                    <- scale(node.traits.MAR$nseed)
+node.traits.MAR$sunken                   <- scale(node.traits.MAR$sunken)
+node.traits.MAR$oneseedw                 <- scale(node.traits.MAR$oneseedw)
+node.traits.MAR$sunken                   <- scale(node.traits.MAR$sunken)
+node.traits.MAR$neighboiurhood_cropsize  <- scale(node.traits.MAR$neighboiurhood_cropsize)
+node.traits.MAR$n_neigh                  <- scale(node.traits.MAR$n_neigh)
+
+
+# I assign the attributes to the graph object by creating an attribute matrix in net.g
+
+#Big-picture
+
+V(net.int)$area                       <-node.traits$area
+V(net.int)$h                          <-node.traits$h
+V(net.int)$d1                         <-node.traits$d1
+V(net.int)$oneseedw                   <-node.traits$oneseedw
+V(net.int)$collapsed_cropsize         <-node.traits$collapsed_cropsize
+V(net.int)$nseed                      <-node.traits$nseed
+V(net.int)$diam                       <-node.traits$diam 
+V(net.int)$sunken                     <-node.traits$sunken
+V(net.int)$neighboiurhood_cropsize    <-node.traits$neighboiurhood_cropsize
+V(net.int)$n_neigh                    <-node.traits$n_neigh
+
+#COL
+
+V(net.COL)$h                          <-node.traits.COL$h
+V(net.COL)$d1                         <-node.traits.COL$d1
+V(net.COL)$oneseedw                   <-node.traits.COL$oneseedw
+V(net.COL)$collapsed_cropsize         <-node.traits.COL$collapsed_cropsize
+V(net.COL)$nseed                      <-node.traits.COL$nseed
+V(net.COL)$diam                       <-node.traits.COL$diam 
+V(net.COL)$sunken                     <-node.traits.COL$sunken
+V(net.COL)$neighboiurhood_cropsize    <-node.traits.COL$neighboiurhood_cropsize
+V(net.COL)$n_neigh                    <-node.traits.COL$n_neigh
+
+#OJI
+
+V(net.OJI)$h                          <-node.traits.OJI$h
+V(net.OJI)$d1                         <-node.traits.OJI$d1
+V(net.OJI)$oneseedw                   <-node.traits.OJI$oneseedw
+V(net.OJI)$collapsed_cropsize         <-node.traits.OJI$collapsed_cropsize
+V(net.OJI)$nseed                      <-node.traits.OJI$nseed
+V(net.OJI)$diam                       <-node.traits.OJI$diam 
+V(net.OJI)$sunken                     <-node.traits.OJI$sunken
+V(net.OJI)$neighboiurhood_cropsize    <-node.traits.OJI$neighboiurhood_cropsize
+V(net.OJI)$n_neigh                    <-node.traits.OJI$n_neigh
+
+#MAR
+
+V(net.MAR)$h                          <-node.traits.MAR$h
+V(net.MAR)$d1                         <-node.traits.MAR$d1
+V(net.MAR)$oneseedw                   <-node.traits.MAR$oneseedw
+V(net.MAR)$collapsed_cropsize         <-node.traits.MAR$collapsed_cropsize
+V(net.MAR)$nseed                      <-node.traits.MAR$nseed
+V(net.MAR)$diam                       <-node.traits.MAR$diam 
+V(net.MAR)$sunken                     <-node.traits.MAR$sunken
+V(net.MAR)$neighboiurhood_cropsize    <-node.traits.MAR$neighboiurhood_cropsize
+V(net.MAR)$n_neigh                    <-node.traits.MAR$n_neigh
+```
+
+# Set up graph matrices for models
+
+After creating the igraph object with the information of each associated node, I have to create an adjacency matrix from the igraph object before getting the analogous network object (NETWORK object). From the igraph object, I also extracted all the plant attribute variables to set vertex attributes (nodes) in the network object. ERGMs work with network objects.
+
+```{r Set up matrices for models, echo=TRUE, message= FALSE, warning= FALSE, }
+
+# Create adjacency matrix of igraph object
+mat.int <- get.adjacency(net.int, attr = "weight")
+mat.col<-  get.adjacency(net.COL, attr = "weight")
+mat.oji<-  get.adjacency(net.OJI, attr = "weight")
+mat.mar<-  get.adjacency(net.MAR, attr = "weight")
+
+
+#Create a dataframe with the attributes
+v.attrs    <- get.data.frame(net.int, what="vertices")[1:105,]
+v.attrsCOL <- get.data.frame(net.COL, what="vertices")[1:35,]
+v.attrsOJI <- get.data.frame(net.OJI, what="vertices")[1:35,]
+v.attrsMAR <- get.data.frame(net.MAR, what="vertices")[1:35,]
+
+# I create the network object for the model - here "bipartite" = number of plants in the network.
+red.big <- network::as.network(as.matrix(mat.int), directed=FALSE, bipartite=105, ignore.eval=FALSE, names.eval='weight') 
+red.col <- network::as.network(as.matrix(mat.col), directed=FALSE, bipartite=35,  ignore.eval=FALSE, names.eval='weight') 
+red.oji <- network::as.network(as.matrix(mat.oji), directed=FALSE, bipartite=35,  ignore.eval=FALSE, names.eval='weight') 
+red.mar <- network::as.network(as.matrix(mat.mar), directed=FALSE, bipartite=35,  ignore.eval=FALSE, names.eval='weight') 
+
+#I set the attributes of the dataframe v.attrs to the netw
+
+#Big-
+network::set.vertex.attribute(red.big, "area",                    v.attrs$area) 
+network::set.vertex.attribute(red.big, "d1",                      v.attrs$d1)
+network::set.vertex.attribute(red.big, "h",                       v.attrs$h)
+network::set.vertex.attribute(red.big, "collapsed_cropsize",      v.attrs$collapsed_cropsize)
+network::set.vertex.attribute(red.big, "neighboiurhood_cropsize", v.attrs$neighboiurhood_cropsize)
+network::set.vertex.attribute(red.big, "n_neigh",                 v.attrs$n_neigh)
+network::set.vertex.attribute(red.big, "nseed",                   v.attrs$nseed)
+network::set.vertex.attribute(red.big, "diam",                    v.attrs$diam)
+network::set.vertex.attribute(red.big, "sunken",                  v.attrs$sunken)
+network::set.vertex.attribute(red.big, "oneseedw",                v.attrs$oneseedw)
+#COL
+network::set.vertex.attribute(red.col, "d1",                      v.attrsCOL$d1)
+network::set.vertex.attribute(red.col, "h",                       v.attrsCOL$h)
+network::set.vertex.attribute(red.col, "collapsed_cropsize",      v.attrsCOL$collapsed_cropsize)
+network::set.vertex.attribute(red.col, "neighboiurhood_cropsize", v.attrsCOL$neighboiurhood_cropsize)
+network::set.vertex.attribute(red.col, "n_neigh",                 v.attrsCOL$n_neigh)
+network::set.vertex.attribute(red.col, "nseed",                   v.attrsCOL$nseed)
+network::set.vertex.attribute(red.col, "diam",                    v.attrsCOL$diam)
+network::set.vertex.attribute(red.col, "sunken",                  v.attrsCOL$sunken)
+network::set.vertex.attribute(red.col, "oneseedw",                v.attrsCOL$oneseedw)
+#OJI
+network::set.vertex.attribute(red.oji, "d1",                      v.attrsOJI$d1)
+network::set.vertex.attribute(red.oji, "h",                       v.attrsOJI$h)
+network::set.vertex.attribute(red.oji, "collapsed_cropsize",      v.attrsOJI$collapsed_cropsize)
+network::set.vertex.attribute(red.oji, "neighboiurhood_cropsize", v.attrsOJI$neighboiurhood_cropsize)
+network::set.vertex.attribute(red.oji, "n_neigh",                 v.attrsOJI$n_neigh)
+network::set.vertex.attribute(red.oji, "nseed",                   v.attrsOJI$nseed)
+network::set.vertex.attribute(red.oji, "diam",                    v.attrsOJI$diam)
+network::set.vertex.attribute(red.oji, "sunken",                  v.attrsOJI$sunken)
+network::set.vertex.attribute(red.oji, "oneseedw",                v.attrsOJI$oneseedw)
+#MAR
+network::set.vertex.attribute(red.mar, "d1",                      v.attrsMAR$d1)
+network::set.vertex.attribute(red.mar, "h",                       v.attrsMAR$h)
+network::set.vertex.attribute(red.mar, "collapsed_cropsize",      v.attrsMAR$collapsed_cropsize)
+network::set.vertex.attribute(red.mar, "neighboiurhood_cropsize", v.attrsMAR$neighboiurhood_cropsize)
+network::set.vertex.attribute(red.mar, "n_neigh",                 v.attrsMAR$n_neigh)
+network::set.vertex.attribute(red.mar, "nseed",                   v.attrsMAR$nseed)
+network::set.vertex.attribute(red.mar, "diam",                    v.attrsMAR$diam)
+network::set.vertex.attribute(red.mar, "sunken",                  v.attrsMAR$sunken)
+network::set.vertex.attribute(red.mar, "oneseedw",                v.attrsMAR$oneseedw)
+```
+
+# ERGM MODELS
+
+The workflow is as follows:
+
+1- Fit the best possible "big picture" model where I will not use the neighborhood variables but the area variables. It will be adjusted in a hierarchical and AIC based way.  
+2- Transfer this model to the small networks, to see how sustained the trends are, and if they vary between sites, and to evaluate the effect of the neighborhood context.
+
+```{r setting models, echo=TRUE, message= FALSE, warning= FALSE}
+library(ergm.count)
+
+# Model formulation
+
+# Empty model
+model.0 <- formula(red.big ~ sum)
+                        #+ b1factor("area", base = 1, form="sum")
+                        #+ b1cov("d1", form= "sum")
+                        #+ b1cov("h", form= "sum")
+                        #+ b1cov("collapsed_cropsize", form= "sum")
+                        #+ b1cov("diam", form= "sum")
+                        #+ b1cov("nseed", form= "sum")
+                        #+ b1cov("sunken", form= "sum")
+                        #+ b1cov("oneseedw", form= "sum")
+# Area model 
+#1 = COL
+#2 = OJI
+#3 = MAR
+model.1<- formula(red.big ~ sum
+                         + b1factor("area", base = 1, form="sum"))
+                        #+ b1cov("d1", form= "sum")
+                        #+ b1cov("h", form= "sum")
+                        #+ b1cov("collapsed_cropsize", form= "sum")
+                        #+ b1cov("diam", form= "sum")
+                        #+ b1cov("nseed", folevels()
+                        #+ b1cov("sunken", form= "sum")
+                        #+ b1cov("oneseedw", form= "sum")
+# General-plant model
+model.2<- formula(red.big ~ sum
+                        #+ b1factor("area", base = 1, form="sum")
+                         + b1cov("d1", form= "sum")
+                         + b1cov("h", form= "sum")
+                         + b1cov("collapsed_cropsize", form= "sum"))
+                        #+ b1cov("diam", form= "sum")
+                        #+ b1cov("nseed", form= "sum")
+                        #+ b1cov("sunken", form= "sum")
+                        #+ b1cov("oneseedw", form= "sum")
+# Cone-model
+model.3<- formula(red.big ~ sum
+                        #+ b1factor("area", base = 1, form="sum")
+                        #+ b1cov("d1", form= "sum")
+                        #+ b1cov("h", form= "sum")
+                        #+ b1cov("collapsed_cropsize", form= "sum")
+                         + b1cov("diam", form= "sum")
+                         + b1cov("nseed", form= "sum")
+                         + b1cov("sunken", form= "sum")
+                         + b1cov("oneseedw", form= "sum"))
+# Cone + plant model
+model.4<- formula(red.big ~ sum
+                        #+ b1factor("area", base = 1, form="sum")
+                         + b1cov("d1", form= "sum")
+                         + b1cov("h", form= "sum")
+                         + b1cov("collapsed_cropsize", form= "sum")
+                         + b1cov("diam", form= "sum")
+                         + b1cov("nseed", form= "sum")
+                         + b1cov("sunken", form= "sum")
+                         + b1cov("oneseedw", form= "sum"))
+# Area + plant model
+model.5<- formula(red.big ~ sum
+                        + b1factor("area", base = 1, form="sum")
+                         + b1cov("d1", form= "sum")
+                         + b1cov("h", form= "sum")
+                         + b1cov("collapsed_cropsize", form= "sum"))
+                         #+ b1cov("diam", form= "sum")
+                         #+ b1cov("nseed", form= "sum")
+                         #+ b1cov("sunken", form= "sum")
+                         #+ b1cov("oneseedw", form= "sum"))
+# Area + cone model
+model.6<- formula(red.big ~ sum
+                        + b1factor("area", base = 1, form="sum")
+                         #+ b1cov("d1", form= "sum")
+                         #+ b1cov("h", form= "sum")
+                         #+ b1cov("collapsed_cropsize", form= "sum")
+                         + b1cov("diam", form= "sum")
+                         + b1cov("nseed", form= "sum")
+                         + b1cov("sunken", form= "sum")
+                         + b1cov("oneseedw", form= "sum"))
+
+
+# Full model
+model.7<- formula(red.big ~ sum
+                         + b1factor("area", base = 1, form="sum")
+                         + b1cov("d1", form= "sum")
+                         + b1cov("h", form= "sum")
+                         + b1cov("collapsed_cropsize", form= "sum")
+                         + b1cov("diam", form= "sum")
+                         + b1cov("nseed", form= "sum")
+                         + b1cov("sunken", form= "sum")
+                         + b1cov("oneseedw", form= "sum"))
+```
+
+# Model fitting
+
+```{r Model fitting, , message= FALSE, warning=FALSE}
+
+set.seed(99) 
+require(ergm.count)
+ergm.model.0 <- ergm(model.0, response = "weight", reference= ~Poisson)
+ergm.model.1 <- ergm(model.1, response = "weight", reference= ~Poisson)
+ergm.model.2 <- ergm(model.2, response = "weight", reference= ~Poisson)
+ergm.model.3 <- ergm(model.3, response = "weight", reference= ~Poisson)
+ergm.model.4 <- ergm(model.4, response = "weight", reference= ~Poisson)
+ergm.model.5 <- ergm(model.5, response = "weight", reference= ~Poisson)
+ergm.model.6 <- ergm(model.6, response = "weight", reference= ~Poisson)
+ergm.model.7 <- ergm(model.7, response = "weight", reference= ~Poisson)
+```
+
+```{r Model summary}
+summary(ergm.model.0) # Modelo vacío                 AIC = -5630    
+summary(ergm.model.1) # Modelo area                  AIC = -5790    
+summary(ergm.model.2) # Modelo planta                AIC = -5890    
+summary(ergm.model.3) # Modelo cono                  AIC = -5981   
+summary(ergm.model.4) # Modelo planta + cono         AIC = -6072*** 
+summary(ergm.model.5) # Modelo area + planta         AIC = -5918  
+summary(ergm.model.6) # Modelo area + cono           AIC = -5917  
+summary(ergm.model.7) # Modelo completo              AIC = -6072  
+```
+
+```{r Models comparison plots}
+
+BIG_PICTURE_MODELNAMES<-c("AREA MODEL","PLANT MODEL","CONE MODEL","PLANT+CONE MODEL WIN","AREA + PLANT MODEL", "AREA + CONE MODEL", "FULL MODEL WIN")
+require(jtools)
+plot_summs(ergm.model.1,ergm.model.2,ergm.model.3,ergm.model.4,ergm.model.5,ergm.model.6,ergm.model.7, model.names = BIG_PICTURE_MODELNAMES,omit.coefs = "sum", scale = TRUE )
+```
+
+```{r bEST big-picture model}
+summary(ergm.model.4) #Table 1
+library(jtools)
+plot_summs(ergm.model.4,omit.coefs = "sum", scale = TRUE )
+```
+
+# Per-stand model formulation
+```{r Per-stand model formulation}
+library(ergm.count)
+
+
+
+# COL
+model.COL <- formula(red.col ~ sum
+                        + b1cov("d1", form= "sum")
+                        + b1cov("h", form= "sum")
+                        + b1cov("collapsed_cropsize", form= "sum")
+                        + b1cov("diam", form= "sum")
+                        + b1cov("nseed", form= "sum")
+                        + b1cov("sunken", form= "sum")
+                        + b1cov("oneseedw", form= "sum")
+                        + b1cov("n_neigh", form= "sum")
+                        + b1cov("neighboiurhood_cropsize", form= "sum"))
+
+# OJI
+model.OJI <- formula(red.oji ~ sum
+                        + b1cov("d1", form= "sum")
+                        + b1cov("h", form= "sum")
+                        + b1cov("collapsed_cropsize", form= "sum")
+                        + b1cov("diam", form= "sum")
+                        + b1cov("nseed", form= "sum")
+                        + b1cov("sunken", form= "sum")
+                        + b1cov("oneseedw", form= "sum")
+                        + b1cov("n_neigh", form= "sum")
+                        + b1cov("neighboiurhood_cropsize", form= "sum"))
+# MAR
+model.MAR <- formula(red.mar ~ sum
+                        + b1cov("d1", form= "sum")
+                        + b1cov("h", form= "sum")
+                        + b1cov("collapsed_cropsize", form= "sum")
+                        + b1cov("diam", form= "sum")
+                        + b1cov("nseed", form= "sum")
+                        + b1cov("sunken", form= "sum")
+                        + b1cov("oneseedw", form= "sum")
+                        + b1cov("n_neigh", form= "sum")
+                        + b1cov("neighboiurhood_cropsize", form= "sum"))
+```
+
+```{r Per-stand model fitting, message= FALSE, warning=FALSE}
+set.seed(99)
+require(ergm.count)
+ergm.model.COL <- ergm(model.COL, response = "weight", reference= ~Poisson)
+ergm.model.OJI <- ergm(model.OJI, response = "weight", reference= ~Poisson)
+ergm.model.MAR <- ergm(model.MAR, response = "weight", reference= ~Poisson)
+```
+
+```{r Models summary}
+summary(ergm.model.COL)                                                       
+summary(ergm.model.OJI) 
+summary(ergm.model.MAR)          
+
+AREANAMES<-c("SABINAR DE COLONIZACIÓN", "SABINAR DEL OJILLO", "SABINAR DEL MARQUES")
+library(jtools)
+plot_coefs(ergm.model.COL,ergm.model.OJI,ergm.model.MAR, model.names = AREANAMES,omit.coefs = "sum", scale = TRUE) 
+```
+
+```{r plotting estimates}
+#COL: LINK (62.47%), PLANT (7.127%) CONE (26.845 %) NEIGH (3.554%)
+#OJI: LINK (49.012%), PLANT (28.113%) CONE ( 10.480%) NEIGH ( 12.394%)
+#MAR: LINK (46.696%), PLANT (16.034%) CONE (26.08268 %) NEIGH (11.185%)
+
+
+area_ergm_df5 <- data.frame(area=c("SABCOL","SABCOL","SABCOL","SABCOL","SABOJI","SABOJI","SABOJI","SABOJI","SABMAR","SABMAR","SABMAR","SABMAR"),level= c("Cone quality traits","dPlant phenotype","Neighbourhood attribues","aLink distribution","Cone quality traits","dPlant phenotype","Neighbourhood attribues","aLink distribution","Cone quality traits","dPlant phenotype","Neighbourhood attribues","aLink distribution"), value= c(26.845,7.127,3.554,62.47,10.480,28.113,12.394,49.012,26.082,16.034,11.185,46.696))
+area_ergm_df5$area<-recode_factor(area_ergm_df5$area, SABMAR ="ASABMAR", SABOJI = "BSABOJI")
+
+plot5<-ggplot(area_ergm_df5, aes(x = area, y = value, fill = level)) + 
+  geom_bar(stat = "identity", color = "black") +   scale_fill_manual(values = c("#ffff99","#fdc086", "#7fc97f", "#beaed4")) + theme_bw()+ labs(y = " CONTRIBUTION TO COMBINED VARIABLES TO TOTAL TOTAL VALUE OF ESTIMATES", x = "AREA")
+
+plot5
+```
